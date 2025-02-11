@@ -19,7 +19,7 @@ jobs:
       - name: Check release label
         id: release-label
         uses: getindata/action-release-label@v1.3.0
-        if: ${{ github.event.pull_request.merged == true }}
+        if: ${{ github.event.pull_request.merged == true || github.event.workflow_dispatch == true }}
 
       - name: Get latest tag
         id: latest-tag
