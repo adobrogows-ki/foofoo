@@ -1,0 +1,33 @@
+name: Generate Text Lines
+
+on:
+  workflow_call:
+    inputs:
+      variables:
+        description: 'Comma-separated list of variables'
+        required: true
+        type: string
+
+jobs:
+  generate-lines:
+    runs-on: ubuntu-latest
+    steps:
+    #   - name: Print each variable inline
+    #     env:
+    #       TEXT_LINES: ${{ join(fromJson(join(['["', replace(github.event.inputs.variables, ',', '","'), '"]'])), '\n') }}
+    #     run: |
+    #       echo -e "Generated line for: $TEXT_LINES"
+      - name: Prepare tags
+        id: tags
+        run: |
+            echo 'list<<EOF' >> $GITHUB_OUTPUT;
+            for tag in $(echo "$(echo -n ${{inputs.variables}} | tr ',' ' ')")
+                do 
+                    echo $TAG_BASE:$tag >> $GITHUB_OUTPUT;
+                done
+            echo 'EOF' >> $GITHUB_OUTPUT
+            echo "baz=$BAZ" >> $GITHUB_OUTPUT
+        env:
+          TAG_BASE: Foo
+          BAZ: Baaaz
+      - run: echo ${{steps.tags.outputs.baz}}

@@ -6,8 +6,25 @@ permissions:
 
 on:
   workflow_call:
+    inputs:
+      semantic_version_update_source:
+        description: "Choose which version should be updated"
+        required: true
+        default: from_label
+        type: string
   workflow_dispatch:
-
+    inputs:
+      semantic_version_update_source:
+        description: "Choose which version should be updated"
+        required: true
+        type: choice
+        default: from_label
+        options:
+          - from_label
+          - patch
+          - minor
+          - major
+        
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -19,48 +36,33 @@ jobs:
       - name: Check release label
         id: release-label
         uses: getindata/action-release-label@v1.3.0
-        if: ${{ github.event.pull_request.merged == true || github.event.workflow_dispatch == true }}
+        if: ${{ github.event.pull_request.merged == true || (github.event.workflow_dispatch) }}
 
       - name: Get latest tag
         id: latest-tag
         uses: actions-ecosystem/action-get-latest-tag@v1.6.0
         with:
           semver_only: true
-        if: ${{ steps.release-label.outputs.level != null }}
+
+      - name: Join tags
+        id: tag-bump
+        env:
+          A: ${{steps.release-label.outputs.level}}
+          B: ${{inputs.semantic_version_update_source}}
+        run: if [[ $B == from_label ]]; then echo $A > $GITHUB_OUTPUT; else echo $B > $GITHUB_OUTPUT; fi
 
       - name: Bump semantic version
         id: bump-semver
         uses: actions-ecosystem/action-bump-semver@v1
-        if: ${{ steps.release-label.outputs.level != null }}
         with:
-          current_version: ${{ steps.latest-tag.outputs.tag }}
-          level: ${{ steps.release-label.outputs.level }}
+          current_version: ${{ steps.tag-bump.outputs }}
+          level: ${{ github.event.pull_request.merged == true && steps.release-label.outputs.level || inputs.semantic_version_update_source != 'from_label' && inputs.semantic_version_update_source }}
 
-      - name: Push new semver tag
-        id: new-semver-tag
-        uses: actions-ecosystem/action-push-tag@v1
+      - name: Create release
         if: ${{ steps.bump-semver.outputs.new_version != null }}
-        with:
-          tag: ${{ steps.bump-semver.outputs.new_version }}
-          message: "${{ steps.bump-semver.outputs.new_version }}: PR #${{ github.event.pull_request.number }} ${{ github.event.pull_request.title }}"
-
-      - name: Generate new release with changelog
-        id: new-release
-        uses: fregante/release-with-changelog@v3
-        if: ${{ steps.bump-semver.outputs.new_version != null }}
-        with:
-          token: "${{ secrets.GITHUB_TOKEN }}"
-          exclude: '^meta|^docs|^document|^lint|^ci|^refactor|readme|bump|dependencies|^v?\d+\.\d+\.\d+'
-          tag: "${{ steps.bump-semver.outputs.new_version }}"
-          title: "Version ${{ steps.bump-semver.outputs.new_version }}"
-          commit-template: "- {title} ← {hash}"
-          skip-on-empty: true
-          template: |
-            ### Changelog
-
-            {commits}
-
-            {range}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create --generate-notes --latest "${{ steps.bump-semver.outputs.new_version }}"
 
       - name: Add PR comment
         id: pr-comment
