@@ -67,7 +67,7 @@ jobs:
       - name: Add PR comment
         id: pr-comment
         uses: actions-ecosystem/action-create-comment@v1
-        if: ${{ steps.bump-semver.outputs.new_version != null }}
+        if: ${{ steps.bump-semver.outputs.new_version != null && github.event.pull_request == true }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ github.event.pull_request.number }}
